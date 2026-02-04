@@ -13,8 +13,6 @@
             <field name="name">Gerente de Aprobación de Entregas</field>
             <!-- Heredamos de internal user para que sea un usuario interno -->
             <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
-            <!-- Opcional: Agregar al admin por defecto -->
-            <field name="users" eval="[(4, ref('base.user_admin'))]"/>
         </record>
     </data>
 </odoo>
