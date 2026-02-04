@@ -1,7 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <data>
-        <!-- Aquí podríamos definir reglas de registro si quisieramos bloquear la vista, 
-             pero como es informativo, usamos los grupos estándar de Odoo en los botones de la vista -->
+        <!-- 1. Definimos una categoría para agrupar los permisos en la vista de usuario -->
+        <record model="ir.module.category" id="module_category_delivery_auth">
+            <field name="name">Control de Entregas</field>
+            <field name="description">Gestión de autorizaciones para entregas no pagadas.</field>
+            <field name="sequence">20</field>
+        </record>
+
+        <!-- 2. Definimos el Grupo de "Aprobador" -->
+        <record id="group_delivery_approver" model="res.groups">
+            <field name="name">Gerente de Aprobación de Entregas</field>
+            <!-- Heredamos de internal user para que sea un usuario interno -->
+            <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+            <!-- Opcional: Agregar al admin por defecto -->
+            <field name="users" eval="[(4, ref('base.user_admin'))]"/>
+        </record>
     </data>
 </odoo>

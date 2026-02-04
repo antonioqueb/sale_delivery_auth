@@ -17,11 +17,12 @@
                         invisible="state not in ['sale'] or delivery_auth_state in ['paid', 'authorized', 'requested']"/>
 
                 <!-- Botón para Aprobar (Visible solo para Grupo Ventas/Admin) -->
+                <!-- Botón para Aprobar (Visible solo para el Grupo Nuevo) -->
                 <button name="action_approve_delivery_auth" 
-                        string="APROBAR ENTREGA" 
+                        string="Aprobar Entrega" 
                         type="object" 
                         class="btn-primary"
-                        groups="sales_team.group_sale_manager"
+                        groups="nombre_de_tu_modulo.group_delivery_approver"
                         invisible="delivery_auth_state != 'requested'"/>
                         
                 <!-- Texto informativo en el header -->
