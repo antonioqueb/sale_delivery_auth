@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_order_form_auth_inherit" model="ir.ui.view">
+        <field name="name">sale.order.form.auth.inherit</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_order_form"/>
+        <field name="arch" type="xml">
+            
+            <!-- Botones en el Header -->
+            <xpath expr="//header" position="inside">
+                
+                <!-- Botón para solicitar (Visible si no está pagado ni autorizado y está confirmado) -->
+                <button name="action_request_delivery_auth" 
+                        string="Solicitar Autorización de Entrega" 
+                        type="object" 
+                        class="btn-secondary"
+                        invisible="state not in ['sale'] or delivery_auth_state in ['paid', 'authorized', 'requested']"/>
+
+                <!-- Botón para Aprobar (Visible solo para Grupo Ventas/Admin) -->
+                <button name="action_approve_delivery_auth" 
+                        string="APROBAR ENTREGA" 
+                        type="object" 
+                        class="btn-primary"
+                        groups="sales_team.group_sale_manager"
+                        invisible="delivery_auth_state != 'requested'"/>
+                        
+                <!-- Texto informativo en el header -->
+                 <field name="delivery_auth_state" widget="statusbar" statusbar_visible="pending,requested,authorized,paid"/>
+            </xpath>
+
+            <!-- Alerta visual dentro de la orden -->
+            <xpath expr="//sheet" position="before">
+                <div class="alert alert-warning" role="alert" 
+                     invisible="delivery_auth_state in ['paid', 'authorized'] or state != 'sale'">
+                    <strong>Atención:</strong> Esta orden no está pagada totalmente. Requiere autorización para entrega.
+                </div>
+                <div class="alert alert-success" role="alert" 
+                     invisible="delivery_auth_state != 'paid'">
+                    <strong>Listo:</strong> Orden pagada al 100%. Entrega autorizada.
+                </div>
+            </xpath>
+
+        </field>
+    </record>
+</odoo>

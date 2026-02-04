@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_picking_form_auth_inherit" model="ir.ui.view">
+        <field name="name">stock.picking.form.auth.inherit</field>
+        <field name="model">stock.picking</field>
+        <field name="inherit_id" ref="stock.view_picking_form"/>
+        <field name="arch" type="xml">
+            
+            <!-- Agregamos el Ribbon (Cinta visual) -->
+            <xpath expr="//sheet" position="inside">
+                <!-- Ribbon Verde: Autorizado o Pagado -->
+                <widget name="web_ribbon" title="AUTORIZADO PARA ENTREGAR" bg_color="bg-success"
+                        invisible="not is_delivery_authorized or state == 'done'"/>
+
+                <!-- Ribbon Rojo: No Autorizado -->
+                <widget name="web_ribbon" title="REQUIERE AUTORIZACIÓN" bg_color="bg-danger"
+                        invisible="is_delivery_authorized or state in ['done', 'cancel']"/>
+                
+                <field name="is_delivery_authorized" invisible="1"/>
+                <field name="sale_auth_state" invisible="1"/>
+            </xpath>
+
+            <!-- Agregamos un aviso más visible cerca de los botones de validación -->
+            <xpath expr="//header" position="after">
+                <div class="alert alert-danger text-center" role="alert" 
+                     invisible="is_delivery_authorized or state in ['done', 'cancel']"
+                     style="margin-bottom:0px;">
+                    <strong>ALERTA:</strong> La orden de venta asociada NO está pagada ni autorizada manualmente.
+                </div>
+            </xpath>
+
+        </field>
+    </record>
+</odoo>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- Aquí podríamos definir reglas de registro si quisieramos bloquear la vista, 
+             pero como es informativo, usamos los grupos estándar de Odoo en los botones de la vista -->
+    </data>
+</odoo>
