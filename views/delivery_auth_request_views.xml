@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- FORMULARIO -->
+    <record id="delivery_auth_request_form_view" model="ir.ui.view">
+        <field name="name">delivery.auth.request.form</field>
+        <field name="model">delivery.auth.request</field>
+        <field name="arch" type="xml">
+            <form string="Solicitud de Autorización de Entrega">
+                <header>
+                    <button name="action_request"
+                            string="Enviar Solicitud"
+                            type="object"
+                            class="btn-primary"
+                            invisible="state != 'draft'"/>
+
+                    <button name="action_approve"
+                            string="Aprobar Entrega"
+                            type="object"
+                            class="btn-success"
+                            groups="delivery_auth_control.group_delivery_approver"
+                            invisible="state != 'requested'"/>
+
+                    <button name="action_reject"
+                            string="Rechazar"
+                            type="object"
+                            class="btn-danger"
+                            groups="delivery_auth_control.group_delivery_approver"
+                            invisible="state != 'requested'"/>
+
+                    <button name="action_cancel"
+                            string="Cancelar"
+                            type="object"
+                            class="btn-secondary"
+                            invisible="state not in ('draft', 'requested')"
+                            confirm="¿Está seguro de cancelar esta solicitud?"/>
+
+                    <button name="action_reset_draft"
+                            string="Restablecer"
+                            type="object"
+                            class="btn-secondary"
+                            invisible="state not in ('cancelled', 'rejected')"/>
+
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,requested,approved"/>
+                </header>
+
+                <sheet>
+                    <widget name="web_ribbon" title="APROBADO" bg_color="bg-success"
+                            invisible="state != 'approved'"/>
+                    <widget name="web_ribbon" title="RECHAZADO" bg_color="bg-danger"
+                            invisible="state != 'rejected'"/>
+                    <widget name="web_ribbon" title="CANCELADO" bg_color="bg-secondary"
+                            invisible="state != 'cancelled'"/>
+
+                    <div class="oe_title">
+                        <h1>
+                            <field name="display_name" readonly="1"/>
+                        </h1>
+                    </div>
+
+                    <group>
+                        <group string="Información de la Venta">
+                            <field name="sale_order_id"/>
+                            <field name="partner_id"/>
+                            <field name="amount_total"/>
+                            <field name="amount_residual"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="currency_id" invisible="1"/>
+                        </group>
+                        <group string="Seguimiento de Autorización">
+                            <field name="requested_by_id"/>
+                            <field name="request_date"/>
+                            <field name="approved_by_id"/>
+                            <field name="approval_date"/>
+                        </group>
+                    </group>
+
+                    <notebook>
+                        <page string="Motivo de Solicitud" name="request_notes">
+                            <field name="request_notes"
+                                   placeholder="Indique la razón por la que se solicita entregar sin pago total..."
+                                   readonly="state != 'draft'"/>
+                        </page>
+                        <page string="Motivo de Rechazo" name="rejection_notes"
+                              invisible="state != 'rejected'">
+                            <field name="rejection_notes" readonly="1"/>
+                        </page>
+                        <page string="Entregas Relacionadas" name="pickings">
+                            <field name="picking_ids" readonly="1">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="picking_type_id"/>
+                                    <field name="scheduled_date"/>
+                                    <field name="state"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- LISTA -->
+    <record id="delivery_auth_request_list_view" model="ir.ui.view">
+        <field name="name">delivery.auth.request.list</field>
+        <field name="model">delivery.auth.request</field>
+        <field name="arch" type="xml">
+            <list string="Solicitudes de Autorización"
+                  decoration-danger="state == 'rejected'"
+                  decoration-success="state == 'approved'"
+                  decoration-muted="state == 'cancelled'"
+                  decoration-warning="state == 'requested'">
+                <field name="sale_order_id"/>
+                <field name="partner_id"/>
+                <field name="amount_total"/>
+                <field name="amount_residual"/>
+                <field name="requested_by_id"/>
+                <field name="request_date"/>
+                <field name="approved_by_id"/>
+                <field name="approval_date"/>
+                <field name="state" widget="badge"
+                       decoration-info="state == 'draft'"
+                       decoration-warning="state == 'requested'"
+                       decoration-success="state == 'approved'"
+                       decoration-danger="state in ('rejected', 'cancelled')"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- BÚSQUEDA -->
+    <record id="delivery_auth_request_search_view" model="ir.ui.view">
+        <field name="name">delivery.auth.request.search</field>
+        <field name="model">delivery.auth.request</field>
+        <field name="arch" type="xml">
+            <search string="Buscar Solicitudes">
+                <field name="sale_order_id"/>
+                <field name="partner_id"/>
+                <field name="requested_by_id"/>
+                <field name="approved_by_id"/>
+                <filter string="Pendientes" name="filter_pending"
+                        domain="[('state', 'in', ('draft', 'requested'))]"/>
+                <filter string="Solicitados" name="filter_requested"
+                        domain="[('state', '=', 'requested')]"/>
+                <filter string="Aprobados" name="filter_approved"
+                        domain="[('state', '=', 'approved')]"/>
+                <filter string="Rechazados" name="filter_rejected"
+                        domain="[('state', '=', 'rejected')]"/>
+                <separator/>
+                <filter string="Mis Solicitudes" name="filter_my_requests"
+                        domain="[('requested_by_id', '=', uid)]"/>
+                <group expand="0" string="Agrupar por">
+                    <filter string="Estado" name="group_state" context="{'group_by': 'state'}"/>
+                    <filter string="Cliente" name="group_partner" context="{'group_by': 'partner_id'}"/>
+                    <filter string="Solicitado por" name="group_requested_by" context="{'group_by': 'requested_by_id'}"/>
+                    <filter string="Aprobado por" name="group_approved_by" context="{'group_by': 'approved_by_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- ACCIONES -->
+    <record id="delivery_auth_request_action" model="ir.actions.act_window">
+        <field name="name">Autorizaciones de Entrega</field>
+        <field name="res_model">delivery.auth.request</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="delivery_auth_request_search_view"/>
+        <field name="context">{'search_default_filter_pending': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No hay solicitudes de autorización de entrega
+            </p>
+            <p>
+                Las solicitudes se crean desde las Órdenes de Venta cuando se requiere
+                entregar productos sin pago total.
+            </p>
+        </field>
+    </record>
+
+    <record id="delivery_auth_request_action_pending" model="ir.actions.act_window">
+        <field name="name">Pendientes de Aprobación</field>
+        <field name="res_model">delivery.auth.request</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="delivery_auth_request_search_view"/>
+        <field name="domain">[('state', '=', 'requested')]</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No hay solicitudes pendientes de aprobación
+            </p>
+        </field>
+    </record>
+
+    <!-- MENÚS bajo Inventario -->
+    <menuitem id="menu_delivery_auth_root"
+              name="Autorizaciones de Entrega"
+              parent="stock.menu_stock_root"
+              sequence="15"/>
+
+    <menuitem id="menu_delivery_auth_all"
+              name="Todas las Solicitudes"
+              parent="menu_delivery_auth_root"
+              action="delivery_auth_request_action"
+              sequence="10"/>
+
+    <menuitem id="menu_delivery_auth_pending"
+              name="Pendientes de Aprobación"
+              parent="menu_delivery_auth_root"
+              action="delivery_auth_request_action_pending"
+              groups="delivery_auth_control.group_delivery_approver"
+              sequence="20"/>
+
+</odoo>

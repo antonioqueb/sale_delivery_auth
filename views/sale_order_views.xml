@@ -5,40 +5,43 @@
         <field name="model">sale.order</field>
         <field name="inherit_id" ref="sale.view_order_form"/>
         <field name="arch" type="xml">
-            
-            <!-- Botones en el Header -->
-            <xpath expr="//header" position="inside">
-                
-                <!-- Botón para solicitar (Visible si no está pagado ni autorizado y está confirmado) -->
-                <button name="action_request_delivery_auth" 
-                        string="Solicitar Autorización de Entrega" 
-                        type="object" 
-                        class="btn-secondary"
-                        invisible="state not in ['sale'] or delivery_auth_state in ['paid', 'authorized', 'requested']"/>
 
-                <!-- Botón para Aprobar (Visible solo para Grupo Ventas/Admin) -->
-                <!-- Botón para Aprobar (Visible solo para el Grupo Nuevo) -->
-                <button name="action_approve_delivery_auth" 
-                        string="Aprobar Entrega" 
-                        type="object" 
-                        class="btn-primary"
-                        groups="nombre_de_tu_modulo.group_delivery_approver"
-                        invisible="delivery_auth_state != 'requested'"/>
-                        
-                <!-- Texto informativo en el header -->
-                 <field name="delivery_auth_state" widget="statusbar" statusbar_visible="pending,requested,authorized,paid"/>
+            <xpath expr="//header" position="inside">
+                <button name="action_create_delivery_auth_request"
+                        string="Solicitar Autorización de Entrega"
+                        type="object"
+                        class="btn-secondary"
+                        icon="fa-lock"
+                        invisible="state != 'sale' or delivery_auth_state in ('paid', 'authorized')"/>
+
+                <field name="delivery_auth_state" widget="statusbar"
+                       statusbar_visible="pending,requested,authorized,paid"/>
             </xpath>
 
-            <!-- Alerta visual dentro de la orden -->
             <xpath expr="//sheet" position="before">
-                <div class="alert alert-warning" role="alert" 
-                     invisible="delivery_auth_state in ['paid', 'authorized'] or state != 'sale'">
-                    <strong>Atención:</strong> Esta orden no está pagada totalmente. Requiere autorización para entrega.
+                <div class="alert alert-warning" role="alert"
+                     invisible="delivery_auth_state in ('paid', 'authorized') or state != 'sale'">
+                    <strong>⚠ Atención:</strong> Esta orden no está pagada totalmente. Requiere autorización para entrega.
                 </div>
-                <div class="alert alert-success" role="alert" 
+                <div class="alert alert-success" role="alert"
                      invisible="delivery_auth_state != 'paid'">
-                    <strong>Listo:</strong> Orden pagada al 100%. Entrega autorizada.
+                    <strong>✓ Listo:</strong> Orden pagada al 100%. Entrega autorizada automáticamente.
                 </div>
+                <div class="alert alert-info" role="alert"
+                     invisible="delivery_auth_state != 'authorized'">
+                    <strong>✓ Autorizado:</strong> Entrega autorizada manualmente.
+                </div>
+            </xpath>
+
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button name="action_view_delivery_auth_requests"
+                        type="object"
+                        class="oe_stat_button"
+                        icon="fa-check-circle"
+                        invisible="delivery_auth_request_count == 0">
+                    <field name="delivery_auth_request_count" widget="statinfo"
+                           string="Autorizaciones"/>
+                </button>
             </xpath>
 
         </field>
