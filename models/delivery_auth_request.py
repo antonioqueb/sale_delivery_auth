@@ -171,7 +171,7 @@ class DeliveryAuthRequest(models.Model):
             rec.sale_order_id.write({'delivery_auth_state': 'pending'})
 
     def _check_approver_rights(self):
-        if not self.env.user.has_group('delivery_auth_control.group_delivery_approver'):
+        if not self.env.user.has_group('sale_delivery_auth.group_delivery_approver'):
             raise UserError(_(
                 'Solo los usuarios del grupo "Gerente de Aprobación de Entregas" '
                 'pueden aprobar o rechazar solicitudes.'

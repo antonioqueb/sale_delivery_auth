@@ -18,14 +18,14 @@
                             string="Aprobar Entrega"
                             type="object"
                             class="btn-success"
-                            groups="delivery_auth_control.group_delivery_approver"
+                            groups="sale_delivery_auth.group_delivery_approver"
                             invisible="state != 'requested'"/>
 
                     <button name="action_reject"
                             string="Rechazar"
                             type="object"
                             class="btn-danger"
-                            groups="delivery_auth_control.group_delivery_approver"
+                            groups="sale_delivery_auth.group_delivery_approver"
                             invisible="state != 'requested'"/>
 
                     <button name="action_cancel"
@@ -208,7 +208,7 @@
               name="Pendientes de Aprobación"
               parent="menu_delivery_auth_root"
               action="delivery_auth_request_action_pending"
-              groups="delivery_auth_control.group_delivery_approver"
+              groups="sale_delivery_auth.group_delivery_approver"
               sequence="20"/>
 
 </odoo>
