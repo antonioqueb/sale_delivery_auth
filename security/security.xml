@@ -9,7 +9,6 @@
 
         <record id="group_delivery_approver" model="res.groups">
             <field name="name">Gerente de Aprobación de Entregas</field>
-            <field name="category_id" ref="module_category_delivery_auth"/>
             <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
         </record>
     </data>
