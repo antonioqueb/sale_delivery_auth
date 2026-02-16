@@ -1,4 +1,5 @@
-from odoo import models, fields, api
+from odoo import models, fields, api, _
+from odoo.exceptions import UserError
 
 
 class StockPicking(models.Model):
@@ -38,19 +39,31 @@ class StockPicking(models.Model):
             auth_state = picking.sale_auth_state
             is_outgoing = picking.picking_type_code == 'outgoing'
 
-            # ¿Viene de venta no pagada? (info para internos y outgoing)
             picking.is_sale_unpaid = (
                 has_sale and auth_state not in ('paid', 'authorized', False)
             )
 
-            # ¿Autorizado? Solo aplica a outgoing
             if is_outgoing and has_sale:
                 picking.is_delivery_authorized = auth_state in ('paid', 'authorized')
             else:
                 picking.is_delivery_authorized = True
 
-            # ¿Requiere auth? Solo outgoing de venta sin pago/auth
             picking.requires_delivery_auth = (
                 is_outgoing and has_sale
                 and auth_state not in ('paid', 'authorized', False)
             )
+
+    def button_validate(self):
+        """Bloquear validación de entregas de salida sin autorización."""
+        for picking in self:
+            if picking.requires_delivery_auth:
+                raise UserError(_(
+                    'No se puede validar la entrega "%s".\n\n'
+                    'La orden de venta %s no está pagada ni tiene autorización '
+                    'de entrega aprobada.\n\n'
+                    'Solicite la autorización desde la Orden de Venta antes de '
+                    'validar esta entrega.',
+                    picking.name,
+                    picking.sale_id.name,
+                ))
+        return super().button_validate()
