@@ -54,16 +54,30 @@ class StockPicking(models.Model):
             )
 
     def button_validate(self):
-        """Bloquear validación de entregas de salida sin autorización."""
+        """Bloquear validación de entregas de salida sin autorización.
+
+        Verificación EN VIVO (no se confía solo en el campo almacenado): la
+        orden debe estar 100% pagada o tener autorización manual vigente para el
+        total ACTUAL. Si se agregó material y subió la deuda, la autorización
+        previa ya no aplica.
+        """
         for picking in self:
-            if picking.requires_delivery_auth:
+            if picking.picking_type_code != 'outgoing' or not picking.sale_id:
+                continue
+            order = picking.sale_id
+            if not order._delivery_is_authorized_now():
                 raise UserError(_(
                     'No se puede validar la entrega "%s".\n\n'
-                    'La orden de venta %s no está pagada ni tiene autorización '
-                    'de entrega aprobada.\n\n'
-                    'Solicite la autorización desde la Orden de Venta antes de '
-                    'validar esta entrega.',
+                    'La orden de venta %s debe estar 100%% PAGADA o tener una '
+                    'autorización de entrega vigente para el total actual.\n\n'
+                    'Pagado: %s de %s %s.\n\n'
+                    'Si se agregó material después de pagar/autorizar, vuelve a '
+                    'pagar el saldo o solicita una nueva autorización desde la '
+                    'Orden de Venta.',
                     picking.name,
-                    picking.sale_id.name,
+                    order.name,
+                    '{:,.2f}'.format(order.delivery_paid_amount or 0.0),
+                    '{:,.2f}'.format(order.amount_total or 0.0),
+                    order.currency_id.name or '',
                 ))
         return super().button_validate()

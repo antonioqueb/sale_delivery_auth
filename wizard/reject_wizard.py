@@ -25,7 +25,7 @@ class DeliveryAuthRejectWizard(models.TransientModel):
             'approval_date': fields.Datetime.now(),
             'rejection_notes': self.rejection_notes,
         })
-        self.request_id.sale_order_id.write({'delivery_auth_state': 'pending'})
+        # El estado de la orden lo deriva el cómputo (solicitud rechazada).
         self.request_id.message_post(
             body=_(
                 'Solicitud <b>RECHAZADA</b> por <b>%s</b>.<br/>Motivo: %s',

@@ -86,13 +86,11 @@ class DeliveryAuthRequest(models.Model):
             state_label = dict(rec._fields['state'].selection).get(rec.state, '')
             rec.display_name = f"AUTH/{so_name} - {state_label}"
 
-    @api.depends('sale_order_id.invoice_ids.amount_residual', 'sale_order_id.invoice_ids.state')
+    @api.depends('sale_order_id.amount_total', 'sale_order_id.delivery_paid_amount')
     def _compute_amount_residual(self):
         for rec in self:
-            valid_invoices = rec.sale_order_id.invoice_ids.filtered(
-                lambda inv: inv.state == 'posted'
-            )
-            rec.amount_residual = sum(valid_invoices.mapped('amount_residual'))
+            order = rec.sale_order_id
+            rec.amount_residual = (order.amount_total or 0.0) - (order.delivery_paid_amount or 0.0)
 
     # ── Acciones ──
     def action_request(self):
@@ -124,7 +122,9 @@ class DeliveryAuthRequest(models.Model):
                 'approved_by_id': self.env.uid,
                 'approval_date': fields.Datetime.now(),
             })
-            rec.sale_order_id.write({'delivery_auth_state': 'authorized'})
+            # Autoriza al TOTAL ACTUAL de la orden. Si luego se agrega material y
+            # el total sube, la autorización deja de ser válida automáticamente.
+            rec.sale_order_id._set_manual_delivery_authorization()
             rec.message_post(
                 body=_(
                     'Autorización de entrega <b>APROBADA</b> por <b>%s</b>.',
@@ -151,7 +151,8 @@ class DeliveryAuthRequest(models.Model):
             if rec.state in ('approved',):
                 raise UserError(_('No se puede cancelar una solicitud ya aprobada.'))
             rec.write({'state': 'cancelled'})
-            rec.sale_order_id.write({'delivery_auth_state': 'pending'})
+            # El estado de la orden lo deriva el cómputo (ya no hay solicitud
+            # pendiente). No se toca la autorización manual previa, si existiera.
             rec.message_post(
                 body=_('Solicitud <b>CANCELADA</b> por <b>%s</b>.', self.env.user.name),
                 message_type='notification',
@@ -168,7 +169,6 @@ class DeliveryAuthRequest(models.Model):
                 'approval_date': False,
                 'rejection_notes': False,
             })
-            rec.sale_order_id.write({'delivery_auth_state': 'pending'})
 
     def _check_approver_rights(self):
         if not self.env.user.has_group('sale_delivery_auth.group_delivery_approver'):
