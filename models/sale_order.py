@@ -30,10 +30,11 @@ class SaleOrder(models.Model):
              'sube por encima de este monto, la autorización deja de ser válida.',
     )
 
-    # Pago real contra la orden (cobertura del 100%).
+    # Pago real contra la orden (cobertura del 100%). Ambos ALMACENADOS y con el
+    # mismo método: evita el warning de 'store'/'compute_sudo' inconsistentes.
     delivery_paid_amount = fields.Monetary(
         string='Pagado (entrega)',
-        compute='_compute_delivery_paid', currency_field='currency_id',
+        compute='_compute_delivery_paid', store=True, currency_field='currency_id',
     )
     delivery_is_fully_paid = fields.Boolean(
         string='Pagado 100%',
