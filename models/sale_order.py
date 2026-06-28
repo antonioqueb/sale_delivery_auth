@@ -72,20 +72,28 @@ class SaleOrder(models.Model):
     )
     def _compute_delivery_paid(self):
         for order in self:
-            posted = order.invoice_ids.filtered(
-                lambda m: m.state == 'posted' and m.move_type in ('out_invoice', 'out_refund')
-            )
-            paid = 0.0
-            for inv in posted:
-                inv_paid = (inv.amount_total or 0.0) - (inv.amount_residual or 0.0)
-                paid += -inv_paid if inv.move_type == 'out_refund' else inv_paid
+            paid, has_posted = order._delivery_paid_live()
             order.delivery_paid_amount = paid
             rounding = order.currency_id.rounding or 0.01
             order.delivery_is_fully_paid = bool(
                 order.amount_total > 0
-                and posted
+                and has_posted
                 and float_compare(paid, order.amount_total, precision_rounding=rounding) >= 0
             )
+
+    def _delivery_paid_live(self):
+        """Suma EN VIVO del dinero realmente recibido en las facturas posteadas
+        del cliente (anticipos incluidos), menos notas de crédito.
+        Devuelve (pagado, hay_factura_posteada)."""
+        self.ensure_one()
+        posted = self.invoice_ids.filtered(
+            lambda m: m.state == 'posted' and m.move_type in ('out_invoice', 'out_refund')
+        )
+        paid = 0.0
+        for inv in posted:
+            inv_paid = (inv.amount_total or 0.0) - (inv.amount_residual or 0.0)
+            paid += -inv_paid if inv.move_type == 'out_refund' else inv_paid
+        return paid, bool(posted)
 
     @api.depends(
         'delivery_is_fully_paid',
@@ -118,14 +126,22 @@ class SaleOrder(models.Model):
             order.delivery_auth_state = 'requested' if has_pending else 'pending'
 
     def _delivery_is_authorized_now(self):
-        """Verificación EN VIVO (se usa al validar la entrega): True si la orden
-        está 100% pagada, o autorizada manualmente y el total no supera el monto
-        autorizado."""
+        """Verificación EN VIVO al validar la entrega. NO se confía en el campo
+        almacenado 'delivery_is_fully_paid' (puede quedar viejo si se agregó
+        material después de pagar): se recalcula el pago contra el total ACTUAL.
+        True si la orden está 100% pagada hoy, o autorizada manualmente y el
+        total no supera el monto autorizado."""
         self.ensure_one()
-        if self.delivery_is_fully_paid:
+        rounding = self.currency_id.rounding or 0.01
+        paid, has_posted = self._delivery_paid_live()
+        fully_paid = bool(
+            self.amount_total > 0
+            and has_posted
+            and float_compare(paid, self.amount_total, precision_rounding=rounding) >= 0
+        )
+        if fully_paid:
             return True
         if self.delivery_auth_manual_authorized:
-            rounding = self.currency_id.rounding or 0.01
             return float_compare(
                 self.amount_total, self.delivery_auth_authorized_amount,
                 precision_rounding=rounding,
