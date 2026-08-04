@@ -5,6 +5,26 @@ from odoo.tools.float_utils import float_compare
 class SaleOrder(models.Model):
     _inherit = 'sale.order'
 
+    def _som_schedule_logistics_activity(self, summary, note):
+        """Crea una actividad en esta orden para CADA miembro del grupo
+        'Logística — Avisos'. Silencioso si el grupo no tiene miembros."""
+        group = self.env.ref(
+            'sale_delivery_auth.group_delivery_logistics',
+            raise_if_not_found=False,
+        )
+        if not group or not group.user_ids:
+            return
+        activity_type = self.env.ref(
+            'mail.mail_activity_data_todo', raise_if_not_found=False)
+        for order in self:
+            for user in group.user_ids:
+                order.activity_schedule(
+                    activity_type_id=activity_type.id if activity_type else False,
+                    summary=summary,
+                    note=note,
+                    user_id=user.id,
+                )
+
     delivery_auth_state = fields.Selection([
         ('pending', 'Pendiente de Pago/Auth'),
         ('requested', 'Autorización Solicitada'),

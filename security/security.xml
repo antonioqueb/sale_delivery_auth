@@ -18,5 +18,16 @@
             <field name="privilege_id" ref="privilege_delivery_auth"/>
             <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
         </record>
+
+        <!-- Miembros que reciben ACTIVIDADES automáticas de logística:
+             al aprobarse una autorización de entrega y al registrarse un
+             pago de una orden. Solo define destinatarios; no da permisos. -->
+        <record id="group_delivery_logistics" model="res.groups">
+            <field name="name">Logística — Avisos</field>
+            <field name="privilege_id" ref="privilege_delivery_auth"/>
+            <field name="comment">Usuarios que reciben actividades automáticas
+                cuando se autoriza la entrega de material y cuando se registra
+                un pago (para programar/preparar la entrega).</field>
+        </record>
     </data>
 </odoo>

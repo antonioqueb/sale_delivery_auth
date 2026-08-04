@@ -133,6 +133,19 @@ class DeliveryAuthRequest(models.Model):
                 message_type='notification',
                 subtype_xmlid='mail.mt_note',
             )
+            # Aviso operativo: logística debe preparar/programar la entrega.
+            rec.sale_order_id._som_schedule_logistics_activity(
+                summary=_('Entrega autorizada — %s') % rec.sale_order_id.name,
+                note=_(
+                    '<p>Se <b>autorizó la entrega</b> de la orden '
+                    '<b>%(order)s</b> (cliente: %(partner)s) por %(user)s.</p>'
+                    '<p>Programar/preparar la entrega del material.</p>'
+                ) % {
+                    'order': rec.sale_order_id.name,
+                    'partner': rec.sale_order_id.partner_id.display_name or '',
+                    'user': self.env.user.name,
+                },
+            )
 
     def action_reject(self):
         self.ensure_one()
