@@ -115,6 +115,21 @@ class DeliveryAuthRequest(models.Model):
             # chatter (inbox/correo). Una nota (mt_note) no notifica a nadie.
             rec._som_notify_approvers()
 
+    def _som_group_users(self, group):
+        """Usuarios de un grupo, tolerante a Odoo 19: res.groups ya no tiene
+        'users'; se resuelve por el campo que exista."""
+        Users = self.env['res.users']
+        if not group:
+            return Users
+        for fname in ('user_ids', 'users'):
+            if fname in group._fields:
+                return group[fname]
+        for fname in ('all_group_ids', 'group_ids', 'groups_id'):
+            if fname in Users._fields:
+                return Users.search([
+                    (fname, 'in', group.id), ('active', '=', True)])
+        return Users
+
     def _som_notify_approvers(self):
         self.ensure_one()
         group = self.env.ref(
@@ -122,7 +137,8 @@ class DeliveryAuthRequest(models.Model):
             raise_if_not_found=False)
         if not group:
             return
-        approvers = group.users.filtered(lambda u: u.id != self.env.uid)
+        approvers = self._som_group_users(group).filtered(
+            lambda u: u.id != self.env.uid)
         if not approvers:
             return
         order = self.sale_order_id
