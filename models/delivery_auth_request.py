@@ -111,6 +111,46 @@ class DeliveryAuthRequest(models.Model):
                 message_type='notification',
                 subtype_xmlid='mail.mt_note',
             )
+            # Los aprobadores DEBEN enterarse: actividad + mención en el
+            # chatter (inbox/correo). Una nota (mt_note) no notifica a nadie.
+            rec._som_notify_approvers()
+
+    def _som_notify_approvers(self):
+        self.ensure_one()
+        group = self.env.ref(
+            'sale_delivery_auth.group_delivery_approver',
+            raise_if_not_found=False)
+        if not group:
+            return
+        approvers = group.users.filtered(lambda u: u.id != self.env.uid)
+        if not approvers:
+            return
+        order = self.sale_order_id
+        summary = _('Autorizar entrega: %s') % (order.name or '')
+        note = _(
+            '%(user)s solicita autorización de ENTREGA para la orden '
+            '%(order)s (cliente: %(partner)s). Saldo pendiente: %(residual).2f. '
+            'Motivo: %(reason)s'
+        ) % {
+            'user': self.env.user.name,
+            'order': order.name or '',
+            'partner': order.partner_id.display_name or '',
+            'residual': self.amount_residual or 0.0,
+            'reason': self.request_notes or _('Sin especificar'),
+        }
+        for user in approvers:
+            self.activity_schedule(
+                'mail.mail_activity_data_todo',
+                user_id=user.id,
+                summary=summary,
+                note=note,
+            )
+        self.message_post(
+            body=_('<p><b>%s</b></p><p>%s</p>', summary, note),
+            partner_ids=approvers.partner_id.ids,
+            message_type='comment',
+            subtype_xmlid='mail.mt_comment',
+        )
 
     def action_approve(self):
         self._check_approver_rights()
@@ -133,6 +173,24 @@ class DeliveryAuthRequest(models.Model):
                 message_type='notification',
                 subtype_xmlid='mail.mt_note',
             )
+            # Avisar al solicitante (la nota de arriba no notifica).
+            if rec.requested_by_id and rec.requested_by_id.id != self.env.uid:
+                rec.activity_schedule(
+                    'mail.mail_activity_data_todo',
+                    user_id=rec.requested_by_id.id,
+                    summary=_('Entrega autorizada: %s') % (rec.sale_order_id.name or ''),
+                    note=_('%s aprobó la autorización de entrega.') % self.env.user.name,
+                )
+                rec.message_post(
+                    body=_(
+                        '<p>Entrega de <b>%s</b> autorizada por %s.</p>',
+                        rec.sale_order_id.name or '',
+                        self.env.user.name,
+                    ),
+                    partner_ids=rec.requested_by_id.partner_id.ids,
+                    message_type='comment',
+                    subtype_xmlid='mail.mt_comment',
+                )
             # Aviso operativo: logística debe preparar/programar la entrega.
             rec.sale_order_id._som_schedule_logistics_activity(
                 summary=_('Entrega autorizada — %s') % rec.sale_order_id.name,
