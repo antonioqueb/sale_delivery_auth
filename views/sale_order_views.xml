@@ -14,8 +14,11 @@
                         icon="fa-lock"
                         invisible="state != 'sale' or delivery_auth_state in ('paid', 'authorized')"/>
 
-                <field name="delivery_auth_state" widget="statusbar"
-                       statusbar_visible="pending,requested,authorized,paid"/>
+                <!-- Estados de autorización FUERA de la vista por pedido
+                     (2026-08-15): el campo queda invisible porque las alertas,
+                     el botón Solicitar Entrega y el candado de entregas lo
+                     usan en sus expresiones; la lógica sigue intacta. -->
+                <field name="delivery_auth_state" invisible="1"/>
             </xpath>
 
             <xpath expr="//sheet" position="before">
