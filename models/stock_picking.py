@@ -69,7 +69,7 @@ class StockPicking(models.Model):
                 raise UserError(_(
                     'No se puede validar la entrega "%s".\n\n'
                     'La orden de venta %s debe estar 100%% PAGADA o tener una '
-                    'autorización de entrega vigente para el total actual.\n\n'
+                    'autorización de entrega vigente.\n\n'
                     'Pagado: %s de %s %s.\n\n'
                     'Si se agregó material después de pagar/autorizar, vuelve a '
                     'pagar el saldo o solicita una nueva autorización desde la '

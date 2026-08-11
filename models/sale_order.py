@@ -46,8 +46,9 @@ class SaleOrder(models.Model):
     delivery_auth_authorized_amount = fields.Monetary(
         string='Monto Autorizado',
         default=0.0, copy=False, currency_field='currency_id',
-        help='Total de la orden al momento de autorizar manualmente. Si el total '
-             'sube por encima de este monto, la autorización deja de ser válida.',
+        help='Snapshot informativo: total de la orden al momento de '
+             'autorizar manualmente. La autorización NO caduca si el total '
+             'cambia (regla de negocio 2026-08-11).',
     )
 
     # Pago real contra la orden (cobertura del 100%). Ambos ALMACENADOS y con el
@@ -129,16 +130,14 @@ class SaleOrder(models.Model):
                 order.delivery_auth_state = 'paid'
                 continue
 
-            # La autorización manual solo vale si el total NO supera lo autorizado.
+            # REGLA DE NEGOCIO (2026-08-11): la autorización manual es
+            # ABSOLUTA — para eso se autoriza. Vale aunque el total cambie
+            # después (los flujos de entrega ajustan cantidades en caliente
+            # y un tope por monto bloqueaba remisiones ya autorizadas).
+            # delivery_auth_authorized_amount queda como snapshot informativo.
             if order.delivery_auth_manual_authorized:
-                rounding = order.currency_id.rounding or 0.01
-                still_valid = float_compare(
-                    order.amount_total, order.delivery_auth_authorized_amount,
-                    precision_rounding=rounding,
-                ) <= 0
-                if still_valid:
-                    order.delivery_auth_state = 'authorized'
-                    continue
+                order.delivery_auth_state = 'authorized'
+                continue
 
             has_pending = any(
                 r.state in ('draft', 'requested') for r in order.delivery_auth_request_ids
@@ -149,8 +148,9 @@ class SaleOrder(models.Model):
         """Verificación EN VIVO al validar la entrega. NO se confía en el campo
         almacenado 'delivery_is_fully_paid' (puede quedar viejo si se agregó
         material después de pagar): se recalcula el pago contra el total ACTUAL.
-        True si la orden está 100% pagada hoy, o autorizada manualmente y el
-        total no supera el monto autorizado."""
+        True si la orden está 100% pagada hoy, o autorizada manualmente
+        (la autorización manual es absoluta: no caduca por cambios de
+        total)."""
         self.ensure_one()
         rounding = self.currency_id.rounding or 0.01
         paid, has_posted = self._delivery_paid_live()
@@ -161,11 +161,9 @@ class SaleOrder(models.Model):
         )
         if fully_paid:
             return True
+        # Autorización manual ABSOLUTA: pasa aunque el total haya cambiado.
         if self.delivery_auth_manual_authorized:
-            return float_compare(
-                self.amount_total, self.delivery_auth_authorized_amount,
-                precision_rounding=rounding,
-            ) <= 0
+            return True
         return False
 
     def _set_manual_delivery_authorization(self):
