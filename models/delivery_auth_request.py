@@ -168,6 +168,30 @@ class DeliveryAuthRequest(models.Model):
             subtype_xmlid='mail.mt_comment',
         )
 
+    def unlink(self):
+        """Borrar una solicitud APROBADA retira la autorización manual de su
+        orden (si ninguna otra solicitud aprobada la respalda). Sin esto, la
+        orden quedaba en un limbo: flags de autorizada viejos, candado de
+        entrega activo y botón de Solicitar Entrega oculto."""
+        orders = self.filtered(
+            lambda r: r.state == 'approved').mapped('sale_order_id')
+        res = super().unlink()
+        for order in orders:
+            if not order.exists():
+                continue
+            still_approved = order.delivery_auth_request_ids.filtered(
+                lambda r: r.state == 'approved')
+            if not still_approved and order.delivery_auth_manual_authorized:
+                order.write({
+                    'delivery_auth_manual_authorized': False,
+                    'delivery_auth_authorized_amount': 0.0,
+                })
+                order.message_post(body=(
+                    'Se eliminó la solicitud de autorización aprobada: la '
+                    'autorización manual de entrega quedó RETIRADA. Solicita '
+                    'una nueva si se requiere entregar sin pago completo.'))
+        return res
+
     def action_approve(self):
         self._check_approver_rights()
         for rec in self:
