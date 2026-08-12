@@ -1,6 +1,6 @@
 {
     'name': 'Control de Autorización de Entregas',
-    'version': '19.0.5.0.0',
+    'version': '19.0.5.1.0',
     'category': 'Sales/Sales',
     'summary': 'Requiere autorización o pago total (100%) para permitir entregas de salida',
     'description': """
