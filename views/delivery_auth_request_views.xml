@@ -190,17 +190,24 @@
         </field>
     </record>
 
-    <!-- MENÚS bajo Inventario -->
+    <!-- MENÚS bajo Inventario.
+         OJO con los grupos: colgar de Inventario sin restringir se lo
+         mostraba a TODO el que tenga stock.group_stock_user — que es todo
+         vendedor, porque lo necesita para ver existencias. Quién autoriza
+         entregas sin pago y quién las prepara es información de control
+         interno: aprobadores, logística y el jefe de almacén. -->
     <menuitem id="menu_delivery_auth_root"
               name="Autorizaciones de Entrega"
               parent="stock.menu_stock_root"
-              sequence="15"/>
+              sequence="15"
+              groups="sale_delivery_auth.group_delivery_approver,sale_delivery_auth.group_delivery_logistics,stock.group_stock_manager"/>
 
     <menuitem id="menu_delivery_auth_all"
               name="Todas las Solicitudes"
               parent="menu_delivery_auth_root"
               action="delivery_auth_request_action"
-              sequence="10"/>
+              sequence="10"
+              groups="sale_delivery_auth.group_delivery_approver,sale_delivery_auth.group_delivery_logistics,stock.group_stock_manager"/>
 
     <menuitem id="menu_delivery_auth_pending"
               name="Pendientes de Aprobación"
