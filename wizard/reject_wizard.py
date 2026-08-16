@@ -37,21 +37,17 @@ class DeliveryAuthRejectWizard(models.TransientModel):
         )
         # Avisar al solicitante (la nota no notifica).
         req = self.request_id
+        # Solo mención de chatter, sin actividad: el rechazo es un aviso que
+        # el vendedor lee, no un pendiente que alguien cierre. La actividad
+        # se quedaba abierta para siempre.
         if req.requested_by_id and req.requested_by_id.id != self.env.uid:
-            req.activity_schedule(
-                'mail.mail_activity_data_todo',
-                user_id=req.requested_by_id.id,
-                summary=_('Entrega rechazada: %s') % (req.sale_order_id.name or ''),
-                note=_('%(user)s rechazó la autorización de entrega. Motivo: %(reason)s') % {
-                    'user': self.env.user.name,
-                    'reason': self.rejection_notes,
-                },
-            )
             req.message_post(
                 body=_(
-                    '<p>Autorización de entrega de <b>%s</b> rechazada por %s.</p>',
-                    req.sale_order_id.name or '',
-                    self.env.user.name,
+                    '<p>Autorización de entrega de <b>%(orden)s</b> '
+                    'rechazada por %(user)s.</p><p>Motivo: %(reason)s</p>',
+                    orden=req.sale_order_id.name or '',
+                    user=self.env.user.name,
+                    reason=self.rejection_notes or _('sin especificar'),
                 ),
                 partner_ids=req.requested_by_id.partner_id.ids,
                 message_type='comment',

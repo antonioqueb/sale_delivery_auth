@@ -159,13 +159,11 @@ class DeliveryAuthRequest(models.Model):
             'residual': self.amount_residual or 0.0,
             'reason': self.request_notes or _('Sin especificar'),
         }
-        for user in approvers:
-            self.activity_schedule(
-                'mail.mail_activity_data_todo',
-                user_id=user.id,
-                summary=summary,
-                note=note,
-            )
+        # SIN ACTIVIDAD a propósito. Se creaba una por aprobador y nadie la
+        # cerraba al autorizar: quedaban abiertas para siempre ensuciando el
+        # reloj del systray. La mención del chatter de abajo ya notifica de
+        # verdad (inbox y correo) a los mismos aprobadores, así que no se
+        # pierde el aviso — solo el pendiente falso.
         self.message_post(
             body=_('<p><b>%s</b></p><p>%s</p>', summary, note),
             partner_ids=approvers.partner_id.ids,
@@ -218,14 +216,11 @@ class DeliveryAuthRequest(models.Model):
                 message_type='notification',
                 subtype_xmlid='mail.mt_note',
             )
-            # Avisar al solicitante (la nota de arriba no notifica).
+            # Avisar al solicitante (la nota de arriba no notifica). Solo
+            # mención de chatter: una actividad aquí sería un pendiente que
+            # el vendedor nunca cierra, porque no hay nada que hacer — es
+            # un aviso, no una tarea.
             if rec.requested_by_id and rec.requested_by_id.id != self.env.uid:
-                rec.activity_schedule(
-                    'mail.mail_activity_data_todo',
-                    user_id=rec.requested_by_id.id,
-                    summary=_('Entrega autorizada: %s') % (rec.sale_order_id.name or ''),
-                    note=_('%s aprobó la autorización de entrega.') % self.env.user.name,
-                )
                 rec.message_post(
                     body=_(
                         '<p>Entrega de <b>%s</b> autorizada por %s.</p>',
