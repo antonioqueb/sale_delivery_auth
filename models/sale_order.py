@@ -12,12 +12,20 @@ class SaleOrder(models.Model):
             'sale_delivery_auth.group_delivery_logistics',
             raise_if_not_found=False,
         )
-        if not group or not group.user_ids:
+        if not group:
+            return
+        # OJO (Odoo 19): user_ids trae SOLO miembros directos. Quien tenga
+        # el grupo por implicación de otro NO aparece ahí y se quedaba sin
+        # aviso, en silencio. all_user_ids sí los incluye.
+        destinatarios = (group.all_user_ids
+                         if 'all_user_ids' in group._fields
+                         else group.user_ids)
+        if not destinatarios:
             return
         activity_type = self.env.ref(
             'mail.mail_activity_data_todo', raise_if_not_found=False)
         for order in self:
-            for user in group.user_ids:
+            for user in destinatarios:
                 order.activity_schedule(
                     activity_type_id=activity_type.id if activity_type else False,
                     summary=summary,
