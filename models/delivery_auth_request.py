@@ -1,5 +1,9 @@
+import logging
+
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError
+
+_logger = logging.getLogger(__name__)
 
 
 class DeliveryAuthRequest(models.Model):
@@ -159,17 +163,58 @@ class DeliveryAuthRequest(models.Model):
             'residual': self.amount_residual or 0.0,
             'reason': self.request_notes or _('Sin especificar'),
         }
-        # SIN ACTIVIDAD a propósito. Se creaba una por aprobador y nadie la
-        # cerraba al autorizar: quedaban abiertas para siempre ensuciando el
-        # reloj del systray. La mención del chatter de abajo ya notifica de
-        # verdad (inbox y correo) a los mismos aprobadores, así que no se
-        # pierde el aviso — solo el pendiente falso.
+        # UNA actividad por aprobador + mención en chatter. Las actividades
+        # se CIERRAN SOLAS al aprobar/rechazar/cancelar (todas, no solo la
+        # del que decidió) vía el hook de write — el reloj del systray
+        # avisa de verdad y no acumula pendientes falsos.
+        for approver in approvers:
+            try:
+                self.activity_schedule(
+                    'mail.mail_activity_data_todo',
+                    summary=summary,
+                    note=note,
+                    user_id=approver.id,
+                )
+            except Exception:
+                _logger.exception(
+                    '[DELIVERY AUTH] No se pudo agendar la actividad de %s '
+                    'para %s.', self.display_name, approver.name)
+
         self.message_post(
             body=_('<p><b>%s</b></p><p>%s</p>', summary, note),
             partner_ids=approvers.partner_id.ids,
             message_type='comment',
             subtype_xmlid='mail.mt_comment',
         )
+
+    def _som_close_open_activities(self, feedback):
+        """Cierra TODAS las actividades abiertas de la solicitud (las de
+        todos los aprobadores, no solo la del que decidió)."""
+        for rec in self:
+            activities = rec.sudo().activity_ids
+            if not activities:
+                continue
+            try:
+                activities.action_feedback(feedback=feedback)
+            except Exception:
+                _logger.exception(
+                    '[DELIVERY AUTH] No se pudieron cerrar las actividades '
+                    'de %s.', rec.display_name)
+
+    def write(self, vals):
+        res = super().write(vals)
+        # Estado terminal (venga del botón, del wizard de rechazo o de la
+        # cancelación): las actividades de autorización se dan por
+        # terminadas con el resultado como feedback.
+        labels = {
+            'approved': _('Aprobada'),
+            'rejected': _('Rechazada'),
+            'cancelled': _('Cancelada'),
+        }
+        if vals.get('state') in labels:
+            self._som_close_open_activities(
+                '%s por %s' % (labels[vals['state']], self.env.user.name))
+        return res
 
     def unlink(self):
         """Borrar una solicitud APROBADA retira la autorización manual de su
