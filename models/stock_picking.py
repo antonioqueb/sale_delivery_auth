@@ -65,17 +65,24 @@ class StockPicking(models.Model):
             if picking.picking_type_code != 'outgoing' or not picking.sale_id:
                 continue
             order = picking.sale_id
-            if not order._delivery_is_authorized_now():
+            # som_log_delivery_tolerance: si la entrega pasa por la
+            # tolerancia SOM-ENT-04, el uso queda asentado en el chatter
+            # de la orden (trazabilidad del requerimiento).
+            if not order.with_context(
+                    som_log_delivery_tolerance=True,
+            )._delivery_is_authorized_now():
                 raise UserError(_(
                     'No se puede validar la entrega "%s".\n\n'
                     'La orden de venta %s debe estar 100%% PAGADA o tener una '
-                    'autorización de entrega vigente.\n\n'
+                    'autorización de entrega vigente (saldos de hasta '
+                    '$%s MXN pasan solos por tolerancia).\n\n'
                     'Pagado: %s de %s %s.\n\n'
                     'Si se agregó material después de pagar/autorizar, vuelve a '
                     'pagar el saldo o solicita una nueva autorización desde la '
                     'Orden de Venta.',
                     picking.name,
                     order.name,
+                    '{:,.2f}'.format(order._delivery_payment_tolerance_mxn()),
                     '{:,.2f}'.format(order.delivery_paid_amount or 0.0),
                     '{:,.2f}'.format(order.amount_total or 0.0),
                     order.currency_id.name or '',

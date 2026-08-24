@@ -152,13 +152,42 @@ class SaleOrder(models.Model):
             )
             order.delivery_auth_state = 'requested' if has_pending else 'pending'
 
+    # SOM-ENT-04 — Tolerancia de pago para entrega, en MXN. Configurable
+    # vía parámetro de sistema; default $100.00 (INCLUSIVE: un saldo de
+    # exactamente $100.00 sí libera).
+    DELIVERY_TOLERANCE_PARAM = 'sale_delivery_auth.payment_tolerance_mxn'
+
+    def _delivery_payment_tolerance_mxn(self):
+        try:
+            return float(self.env['ir.config_parameter'].sudo().get_param(
+                self.DELIVERY_TOLERANCE_PARAM, '100') or 100.0)
+        except (TypeError, ValueError):
+            return 100.0
+
+    def _delivery_pending_mxn(self, paid):
+        """Saldo pendiente expresado en MXN. La tolerancia se define en
+        pesos; una orden en USD convierte su saldo con el tipo de cambio
+        vigente, así los residuos cambiarios chicos también quedan
+        cubiertos."""
+        self.ensure_one()
+        pending = max((self.amount_total or 0.0) - (paid or 0.0), 0.0)
+        mxn = self.env.ref('base.MXN', raise_if_not_found=False)
+        if not mxn or not self.currency_id or self.currency_id == mxn:
+            return pending
+        try:
+            return self.currency_id._convert(
+                pending, mxn, self.company_id or self.env.company,
+                fields.Date.context_today(self))
+        except Exception:
+            return pending
+
     def _delivery_is_authorized_now(self):
         """Verificación EN VIVO al validar la entrega. NO se confía en el campo
         almacenado 'delivery_is_fully_paid' (puede quedar viejo si se agregó
         material después de pagar): se recalcula el pago contra el total ACTUAL.
-        True si la orden está 100% pagada hoy, o autorizada manualmente
+        True si la orden está 100% pagada hoy, autorizada manualmente
         (la autorización manual es absoluta: no caduca por cambios de
-        total)."""
+        total), o con saldo dentro de la TOLERANCIA (SOM-ENT-04)."""
         self.ensure_one()
         rounding = self.currency_id.rounding or 0.01
         paid, has_posted = self._delivery_paid_live()
@@ -172,6 +201,32 @@ class SaleOrder(models.Model):
         # Autorización manual ABSOLUTA: pasa aunque el total haya cambiado.
         if self.delivery_auth_manual_authorized:
             return True
+        # SOM-ENT-04 — TOLERANCIA: un saldo de $0.01 a $100.00 MXN
+        # (inclusive) NO detiene la entrega ni consume autorizaciones
+        # directivas. Exige al menos una factura posteada con pago (la
+        # tolerancia perdona un residuo, no la ausencia de pago). Cubre
+        # cualquier residuo chico: diferencias cambiarias y redondeos.
+        # Con el contexto som_log_delivery_tolerance (validación real de
+        # la entrega) la aplicación queda registrada en el chatter.
+        if self.amount_total > 0 and has_posted and paid > 0:
+            pending_mxn = self._delivery_pending_mxn(paid)
+            tolerance = self._delivery_payment_tolerance_mxn()
+            if pending_mxn > 0 and float_compare(
+                    pending_mxn, tolerance, precision_digits=2) <= 0:
+                if self.env.context.get('som_log_delivery_tolerance'):
+                    self.message_post(body=_(
+                        '🟢 Tolerancia de pago aplicada (SOM-ENT-04): '
+                        'entrega liberada con saldo pendiente de '
+                        '$%(pend).2f MXN (tope $%(tol).2f MXN). Pagado '
+                        '%(paid).2f de %(total).2f %(cur)s. No se consumió '
+                        'autorización directiva.') % {
+                            'pend': pending_mxn,
+                            'tol': tolerance,
+                            'paid': paid,
+                            'total': self.amount_total or 0.0,
+                            'cur': self.currency_id.name or '',
+                        })
+                return True
         return False
 
     def _set_manual_delivery_authorization(self):
@@ -184,6 +239,23 @@ class SaleOrder(models.Model):
 
     def action_create_delivery_auth_request(self):
         self.ensure_one()
+        # SOM-ENT-04: con el saldo dentro de la tolerancia la entrega ya
+        # pasa sola — no se consume una autorización directiva de balde.
+        if self._delivery_is_authorized_now():
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'type': 'success',
+                    'sticky': False,
+                    'title': _('No se necesita autorización'),
+                    'message': _(
+                        'La entrega de %s ya está liberada (pagada, '
+                        'autorizada o con saldo dentro de la tolerancia '
+                        'de $%.2f MXN). Valida la entrega directamente.'
+                    ) % (self.name, self._delivery_payment_tolerance_mxn()),
+                },
+            }
         active_request = self.delivery_auth_request_ids.filtered(
             lambda r: r.state in ('draft', 'requested')
         )
