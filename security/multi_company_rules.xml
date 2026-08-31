@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Multiempresa: la solicitud de autorización vive en la compañía
+             de su orden de venta (company_id related almacenado). -->
+        <record id="rule_delivery_auth_request_company" model="ir.rule">
+            <field name="name">Solicitud de autorización de entrega: multiempresa</field>
+            <field name="model_id" ref="model_delivery_auth_request"/>
+            <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+            <field name="global" eval="True"/>
+        </record>
+    </data>
+</odoo>

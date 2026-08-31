@@ -175,8 +175,9 @@ class SaleOrder(models.Model):
         if not mxn or not self.currency_id or self.currency_id == mxn:
             return pending
         try:
+            # Tipo de cambio de la compañía de la ORDEN (multiempresa).
             return self.currency_id._convert(
-                pending, mxn, self.company_id or self.env.company,
+                pending, mxn, self.company_id,
                 fields.Date.context_today(self))
         except Exception:
             return pending

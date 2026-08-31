@@ -126,6 +126,7 @@
                        decoration-warning="state == 'requested'"
                        decoration-success="state == 'approved'"
                        decoration-danger="state in ('rejected', 'cancelled')"/>
+                <field name="company_id" optional="hide" groups="base.group_multi_company"/>
             </list>
         </field>
     </record>
@@ -155,6 +156,7 @@
                     <filter string="Cliente" name="group_partner" context="{'group_by': 'partner_id'}"/>
                     <filter string="Solicitado por" name="group_requested_by" context="{'group_by': 'requested_by_id'}"/>
                     <filter string="Aprobado por" name="group_approved_by" context="{'group_by': 'approved_by_id'}"/>
+                    <filter string="Compañía" name="group_company" context="{'group_by': 'company_id'}" groups="base.group_multi_company"/>
             </search>
         </field>
     </record>

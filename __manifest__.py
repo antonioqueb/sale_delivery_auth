@@ -1,6 +1,6 @@
 {
     'name': 'Control de Autorización de Entregas',
-    'version': '19.0.5.6.0',
+    'version': '19.0.5.7.0',
     'category': 'Sales/Sales',
     'summary': 'Requiere autorización o pago total (100%) para permitir entregas de salida',
     'description': """
@@ -22,6 +22,7 @@
     'data': [
         'security/security.xml',
         'security/ir.model.access.csv',
+        'security/multi_company_rules.xml',
         'views/delivery_auth_request_views.xml',
         'views/sale_order_views.xml',
         'views/stock_picking_views.xml',
