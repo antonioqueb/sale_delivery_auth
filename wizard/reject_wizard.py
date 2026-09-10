@@ -35,12 +35,12 @@ class DeliveryAuthRejectWizard(models.TransientModel):
             message_type='notification',
             subtype_xmlid='mail.mt_note',
         )
-        # Avisar al solicitante (la nota no notifica).
+        # Avisar al solicitante Y al vendedor de la orden (la nota no
+        # notifica). Solo mención de chatter, sin actividad: el rechazo es
+        # un aviso que se lee, no un pendiente que alguien cierre.
         req = self.request_id
-        # Solo mención de chatter, sin actividad: el rechazo es un aviso que
-        # el vendedor lee, no un pendiente que alguien cierre. La actividad
-        # se quedaba abierta para siempre.
-        if req.requested_by_id and req.requested_by_id.id != self.env.uid:
+        recipients = req._som_result_partners()
+        if recipients:
             req.message_post(
                 body=_(
                     '<p>Autorización de entrega de <b>%(orden)s</b> '
@@ -49,7 +49,7 @@ class DeliveryAuthRejectWizard(models.TransientModel):
                     user=self.env.user.name,
                     reason=self.rejection_notes or _('sin especificar'),
                 ),
-                partner_ids=req.requested_by_id.partner_id.ids,
+                partner_ids=recipients.ids,
                 message_type='comment',
                 subtype_xmlid='mail.mt_comment',
             )

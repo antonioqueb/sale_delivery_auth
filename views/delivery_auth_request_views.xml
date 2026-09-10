@@ -63,6 +63,7 @@
                         <group string="Información de la Venta">
                             <field name="sale_order_id"/>
                             <field name="partner_id"/>
+                            <field name="salesperson_id"/>
                             <field name="amount_total"/>
                             <field name="amount_residual"/>
                             <field name="company_id" groups="base.group_multi_company"/>
@@ -115,6 +116,7 @@
                   decoration-warning="state == 'requested'">
                 <field name="sale_order_id"/>
                 <field name="partner_id"/>
+                <field name="salesperson_id"/>
                 <field name="amount_total"/>
                 <field name="amount_residual"/>
                 <field name="requested_by_id"/>
@@ -139,6 +141,7 @@
             <search string="Buscar Solicitudes">
                 <field name="sale_order_id"/>
                 <field name="partner_id"/>
+                <field name="salesperson_id"/>
                 <field name="requested_by_id"/>
                 <field name="approved_by_id"/>
                 <filter string="Pendientes" name="filter_pending"
@@ -152,8 +155,11 @@
                 <separator/>
                 <filter string="Mis Solicitudes" name="filter_my_requests"
                         domain="[('requested_by_id', '=', uid)]"/>
+                <filter string="Mis Ventas" name="filter_my_sales"
+                        domain="[('salesperson_id', '=', uid)]"/>
                     <filter string="Estado" name="group_state" context="{'group_by': 'state'}"/>
                     <filter string="Cliente" name="group_partner" context="{'group_by': 'partner_id'}"/>
+                    <filter string="Vendedor" name="group_salesperson" context="{'group_by': 'salesperson_id'}"/>
                     <filter string="Solicitado por" name="group_requested_by" context="{'group_by': 'requested_by_id'}"/>
                     <filter string="Aprobado por" name="group_approved_by" context="{'group_by': 'approved_by_id'}"/>
                     <filter string="Compañía" name="group_company" context="{'group_by': 'company_id'}" groups="base.group_multi_company"/>

@@ -63,6 +63,13 @@ class DeliveryAuthRequest(models.Model):
     request_date = fields.Datetime(
         string='Fecha de Solicitud', readonly=True,
     )
+    # Quien pide la autorización casi nunca es el vendedor: logística /
+    # administración solicita a nombre de todo el equipo. El vendedor de la
+    # orden se muestra aparte y recibe también el resultado.
+    salesperson_id = fields.Many2one(
+        related='sale_order_id.user_id',
+        string='Vendedor', store=True, readonly=True,
+    )
     approved_by_id = fields.Many2one(
         'res.users', string='Aprobado/Rechazado por',
         readonly=True, tracking=True,
@@ -154,12 +161,13 @@ class DeliveryAuthRequest(models.Model):
         summary = _('Autorizar entrega: %s') % (order.name or '')
         note = _(
             '%(user)s solicita autorización de ENTREGA para la orden '
-            '%(order)s (cliente: %(partner)s). Saldo pendiente: %(residual).2f. '
-            'Motivo: %(reason)s'
+            '%(order)s (cliente: %(partner)s, vendedor: %(seller)s). '
+            'Saldo pendiente: %(residual).2f. Motivo: %(reason)s'
         ) % {
             'user': self.env.user.name,
             'order': order.name or '',
             'partner': order.partner_id.display_name or '',
+            'seller': order.user_id.name or _('sin vendedor'),
             'residual': self.amount_residual or 0.0,
             'reason': self.request_notes or _('Sin especificar'),
         }
@@ -186,6 +194,14 @@ class DeliveryAuthRequest(models.Model):
             message_type='comment',
             subtype_xmlid='mail.mt_comment',
         )
+
+    def _som_result_partners(self):
+        """Partners que deben enterarse del resultado: quien solicitó y el
+        vendedor de la orden (sin repetir y sin quien está decidiendo)."""
+        self.ensure_one()
+        users = (self.requested_by_id | self.salesperson_id).filtered(
+            lambda u: u.active and u.id != self.env.uid)
+        return users.partner_id
 
     def _som_close_open_activities(self, feedback):
         """Cierra TODAS las actividades abiertas de la solicitud (las de
@@ -261,18 +277,19 @@ class DeliveryAuthRequest(models.Model):
                 message_type='notification',
                 subtype_xmlid='mail.mt_note',
             )
-            # Avisar al solicitante (la nota de arriba no notifica). Solo
-            # mención de chatter: una actividad aquí sería un pendiente que
-            # el vendedor nunca cierra, porque no hay nada que hacer — es
-            # un aviso, no una tarea.
-            if rec.requested_by_id and rec.requested_by_id.id != self.env.uid:
+            # Avisar al solicitante Y al vendedor de la orden (la nota de
+            # arriba no notifica). Solo mención de chatter: una actividad
+            # aquí sería un pendiente que nadie cierra, porque no hay nada
+            # que hacer — es un aviso, no una tarea.
+            recipients = rec._som_result_partners()
+            if recipients:
                 rec.message_post(
                     body=_(
                         '<p>Entrega de <b>%s</b> autorizada por %s.</p>',
                         rec.sale_order_id.name or '',
                         self.env.user.name,
                     ),
-                    partner_ids=rec.requested_by_id.partner_id.ids,
+                    partner_ids=recipients.ids,
                     message_type='comment',
                     subtype_xmlid='mail.mt_comment',
                 )
