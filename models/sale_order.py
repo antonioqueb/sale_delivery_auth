@@ -1,5 +1,11 @@
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
 from odoo import models, fields, api, _
+from odoo.exceptions import UserError
 from odoo.tools.float_utils import float_compare
+
+MONTERREY_TZ = ZoneInfo('America/Monterrey')
 
 
 class SaleOrder(models.Model):
@@ -238,8 +244,56 @@ class SaleOrder(models.Model):
                 'delivery_auth_authorized_amount': order.amount_total,
             })
 
+    # ------------------------------------------------------------------
+    # Candado de rol: entregar sin pago y registrar pagos es del VENDEDOR
+    # ------------------------------------------------------------------
+    @api.model
+    def _som_delivery_staff_lock_reason(self):
+        """Motivo del bloqueo (str) o False si el usuario puede seguir.
+
+        Regla (20 sep 2026): Usuario de Entregas y Gerente de Entregas NO
+        solicitan entregas sin pago ni registran pagos; eso lo hace el
+        vendedor. Excepciones: Autorizador de Entregas (como siempre) y el
+        administrador general del sistema. Los SÁBADOS (hora de Monterrey)
+        sí pueden. OJO: Gerente implica Autorizador por implied_ids, por eso
+        se evalúa Gerente ANTES que Autorizador."""
+        user = self.env.user
+        if user.has_group('base.group_system'):
+            return False
+
+        def has(xmlid):
+            return bool(self.env.ref(xmlid, raise_if_not_found=False)) and user.has_group(xmlid)
+
+        if has('sale_delivery_wizard.group_delivery_manager'):
+            role = _('Gerente de Entregas')
+        elif has('sale_delivery_wizard.group_delivery_authorizer'):
+            return False
+        elif has('sale_delivery_wizard.group_delivery_user'):
+            role = _('Usuario de Entregas')
+        else:
+            return False
+        if datetime.now(MONTERREY_TZ).weekday() == 5:  # sábado en Monterrey
+            return False
+        return _(
+            'Entregar sin pago y registrar pagos es tarea del VENDEDOR de la orden. '
+            'Como %s solo puedes hacerlo los sábados.') % role
+
+    x_delivery_staff_locked = fields.Boolean(
+        string='Bloqueado por rol de entregas',
+        compute='_compute_x_delivery_staff_locked',
+        help="Verdadero cuando el usuario actual es Usuario/Gerente de Entregas y hoy no es sábado.")
+
+    @api.depends_context('uid')
+    def _compute_x_delivery_staff_locked(self):
+        locked = bool(self._som_delivery_staff_lock_reason())
+        for order in self:
+            order.x_delivery_staff_locked = locked
+
     def action_create_delivery_auth_request(self):
         self.ensure_one()
+        reason = self._som_delivery_staff_lock_reason()
+        if reason:
+            raise UserError(reason)
         # SOM-ENT-04: con el saldo dentro de la tolerancia la entrega ya
         # pasa sola — no se consume una autorización directiva de balde.
         if self._delivery_is_authorized_now():

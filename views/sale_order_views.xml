@@ -7,12 +7,17 @@
         <field name="arch" type="xml">
 
             <xpath expr="//header" position="inside">
+                <!-- "Entregar sin pago" (antes "Solicitar Entrega"): lo pide el
+                     VENDEDOR. Usuario/Gerente de Entregas no lo ven salvo los
+                     sábados (x_delivery_staff_locked); Autorizador de Entregas y
+                     administrador del sistema siempre. -->
                 <button name="action_create_delivery_auth_request"
-                        string="Solicitar Entrega"
+                        string="Entregar sin pago"
                         type="object"
                         class="btn-secondary"
                         icon="fa-lock"
-                        invisible="state not in ('sale', 'done') or delivery_auth_state in ('paid', 'authorized')"/>
+                        invisible="state not in ('sale', 'done') or delivery_auth_state in ('paid', 'authorized') or x_delivery_staff_locked"/>
+                <field name="x_delivery_staff_locked" invisible="1"/>
 
                 <!-- Estados de autorización FUERA de la vista por pedido
                      (2026-08-15): el campo queda invisible porque las alertas,

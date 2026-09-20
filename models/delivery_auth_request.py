@@ -105,6 +105,11 @@ class DeliveryAuthRequest(models.Model):
 
     # ── Acciones ──
     def action_request(self):
+        # Mismo candado que el botón "Entregar sin pago" de la orden: una
+        # solicitud creada a mano desde el menú no lo brinca.
+        reason = self.env['sale.order']._som_delivery_staff_lock_reason()
+        if reason:
+            raise UserError(reason)
         for rec in self:
             if rec.state != 'draft':
                 raise UserError(_('Solo se pueden enviar solicitudes en estado Borrador.'))
