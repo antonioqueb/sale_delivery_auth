@@ -188,12 +188,36 @@ class DeliveryAuthRequest(models.Model):
                     '[DELIVERY AUTH] No se pudo agendar la actividad de %s '
                     'para %s.', self.display_name, approver.name)
 
+        # Constancia sin destinatarios: los aprobadores ya tienen su
+        # actividad en el Centro; la mención duplicaba el aviso.
         self.message_post(
             body=_('<p><b>%s</b></p><p>%s</p>', summary, note),
-            partner_ids=approvers.partner_id.ids,
-            message_type='comment',
-            subtype_xmlid='mail.mt_comment',
+            message_type='notification',
+            subtype_xmlid='mail.mt_note',
         )
+
+    def _som_result_users(self):
+        """Usuarios que deben enterarse del resultado: quien solicitó y el
+        vendedor de la orden (sin repetir y sin quien está decidiendo)."""
+        self.ensure_one()
+        return (self.requested_by_id | self.salesperson_id).filtered(
+            lambda u: u.active and u.id != self.env.uid)
+
+    def _som_notify_result(self, outcome, note):
+        """Resultado (aprobada/rechazada) como actividad tipo "aviso" del
+        Centro para solicitante y vendedor. Debe llamarse DESPUÉS de escribir
+        el estado: el hook de write() cierra las actividades previas."""
+        self.ensure_one()
+        summary = _('Resultado de autorización de entrega: %(orden)s %(outcome)s',
+                    orden=self.sale_order_id.name or '', outcome=outcome)
+        for user in self._som_result_users():
+            try:
+                self.activity_schedule(
+                    'mail.mail_activity_data_todo', user_id=user.id,
+                    summary=summary, note=note)
+            except Exception:  # noqa: BLE001
+                _logger.exception('[DELIVERY AUTH] No se pudo avisar el resultado de %s a %s.',
+                                  self.display_name, user.name)
 
     def _som_result_partners(self):
         """Partners que deben enterarse del resultado: quien solicitó y el
@@ -281,18 +305,9 @@ class DeliveryAuthRequest(models.Model):
             # arriba no notifica). Solo mención de chatter: una actividad
             # aquí sería un pendiente que nadie cierra, porque no hay nada
             # que hacer — es un aviso, no una tarea.
-            recipients = rec._som_result_partners()
-            if recipients:
-                rec.message_post(
-                    body=_(
-                        '<p>Entrega de <b>%s</b> autorizada por %s.</p>',
-                        rec.sale_order_id.name or '',
-                        self.env.user.name,
-                    ),
-                    partner_ids=recipients.ids,
-                    message_type='comment',
-                    subtype_xmlid='mail.mt_comment',
-                )
+            rec._som_notify_result(_('APROBADA'), _(
+                '<p>Entrega de <b>%s</b> autorizada por %s.</p>',
+                rec.sale_order_id.name or '', self.env.user.name))
             # Aviso operativo: logística debe preparar/programar la entrega.
             rec.sale_order_id._som_schedule_logistics_activity(
                 summary=_('Entrega autorizada — %s') % rec.sale_order_id.name,

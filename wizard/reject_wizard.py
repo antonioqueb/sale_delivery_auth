@@ -39,18 +39,11 @@ class DeliveryAuthRejectWizard(models.TransientModel):
         # notifica). Solo mención de chatter, sin actividad: el rechazo es
         # un aviso que se lee, no un pendiente que alguien cierre.
         req = self.request_id
-        recipients = req._som_result_partners()
-        if recipients:
-            req.message_post(
-                body=_(
-                    '<p>Autorización de entrega de <b>%(orden)s</b> '
-                    'rechazada por %(user)s.</p><p>Motivo: %(reason)s</p>',
-                    orden=req.sale_order_id.name or '',
-                    user=self.env.user.name,
-                    reason=self.rejection_notes or _('sin especificar'),
-                ),
-                partner_ids=recipients.ids,
-                message_type='comment',
-                subtype_xmlid='mail.mt_comment',
-            )
+        req._som_notify_result(_('RECHAZADA'), _(
+            '<p>Autorización de entrega de <b>%(orden)s</b> '
+            'rechazada por %(user)s.</p><p>Motivo: %(reason)s</p>',
+            orden=req.sale_order_id.name or '',
+            user=self.env.user.name,
+            reason=self.rejection_notes or _('sin especificar'),
+        ))
         return {'type': 'ir.actions.act_window_close'}
