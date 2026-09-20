@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="delivery_auth_send_wizard_form" model="ir.ui.view">
+        <field name="name">delivery.auth.send.wizard.form</field>
+        <field name="model">delivery.auth.send.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Entregar sin pago">
+                <div class="alert alert-warning mb-3" role="alert">
+                    Se enviará a los aprobadores una <b>solicitud para entregar sin el pago completo</b>.
+                    La entrega queda bloqueada hasta que la autoricen.
+                </div>
+                <group>
+                    <field name="sale_order_id"/>
+                    <field name="amount_pending"/>
+                    <field name="request_notes"
+                           placeholder="Motivo (opcional): por qué se entrega sin pago, acuerdo con el cliente…"
+                           widget="text"/>
+                </group>
+                <footer>
+                    <button name="action_send"
+                            string="Enviar solicitud"
+                            type="object"
+                            class="btn-primary"
+                            icon="fa-paper-plane"/>
+                    <button string="Cancelar" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

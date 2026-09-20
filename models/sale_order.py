@@ -311,31 +311,26 @@ class SaleOrder(models.Model):
                     ) % (self.name, self._delivery_payment_tolerance_mxn()),
                 },
             }
-        active_request = self.delivery_auth_request_ids.filtered(
-            lambda r: r.state in ('draft', 'requested')
-        )
-        if active_request:
+        sent = self.delivery_auth_request_ids.filtered(lambda r: r.state == 'requested')
+        if sent:
+            # Ya hay una solicitud en manos de los aprobadores: se muestra.
             return {
                 'type': 'ir.actions.act_window',
                 'name': _('Solicitud de Autorización'),
                 'res_model': 'delivery.auth.request',
-                'res_id': active_request[0].id,
+                'res_id': sent[0].id,
                 'view_mode': 'form',
                 'target': 'current',
             }
-
-        request = self.env['delivery.auth.request'].create({
-            'sale_order_id': self.id,
-            'state': 'draft',
-        })
-        # El estado de la orden lo deriva el cómputo (hay solicitud pendiente).
+        # UN solo paso: motivo (opcional) + «Enviar solicitud». Un borrador
+        # heredado del flujo anterior lo reutiliza el wizard.
         return {
             'type': 'ir.actions.act_window',
-            'name': _('Solicitud de Autorización'),
-            'res_model': 'delivery.auth.request',
-            'res_id': request.id,
+            'name': _('Entregar sin pago'),
+            'res_model': 'delivery.auth.send.wizard',
             'view_mode': 'form',
-            'target': 'current',
+            'target': 'new',
+            'context': {'default_sale_order_id': self.id},
         }
 
     def action_view_delivery_auth_requests(self):

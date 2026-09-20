@@ -1,6 +1,6 @@
 {
     'name': 'Control de Autorización de Entregas',
-    'version': '19.0.5.10.0',
+    'version': '19.0.5.11.0',
     'category': 'Sales/Sales',
     'summary': 'Requiere autorización o pago total (100%) para permitir entregas de salida',
     'description': """
@@ -27,6 +27,7 @@
         'views/sale_order_views.xml',
         'views/stock_picking_views.xml',
         'wizard/reject_wizard_views.xml',
+        'wizard/send_wizard_views.xml',
     ],
     'installable': True,
     'application': False,

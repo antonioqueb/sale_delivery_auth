@@ -3,3 +3,4 @@ access_delivery_auth_request_user,delivery.auth.request.user,model_delivery_auth
 access_delivery_auth_request_sale,delivery.auth.request.sale,model_delivery_auth_request,sales_team.group_sale_salesman,1,1,1,0
 access_delivery_auth_request_approver,delivery.auth.request.approver,model_delivery_auth_request,sale_delivery_auth.group_delivery_approver,1,1,1,1
 access_delivery_auth_reject_wizard,delivery.auth.reject.wizard,model_delivery_auth_reject_wizard,sale_delivery_auth.group_delivery_approver,1,1,1,1
+access_delivery_auth_send_wizard,delivery.auth.send.wizard,model_delivery_auth_send_wizard,base.group_user,1,1,1,1
