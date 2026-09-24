@@ -84,7 +84,7 @@ class StockPicking(models.Model):
                     order.name,
                     '{:,.2f}'.format(order._delivery_payment_tolerance_mxn()),
                     '{:,.2f}'.format(order.delivery_paid_amount or 0.0),
-                    '{:,.2f}'.format(order.amount_total or 0.0),
+                    '{:,.2f}'.format(order._delivery_due_total()),
                     order.currency_id.name or '',
                 ))
         return super().button_validate()

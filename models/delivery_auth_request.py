@@ -101,7 +101,9 @@ class DeliveryAuthRequest(models.Model):
     def _compute_amount_residual(self):
         for rec in self:
             order = rec.sale_order_id
-            rec.amount_residual = (order.amount_total or 0.0) - (order.delivery_paid_amount or 0.0)
+            rec.amount_residual = (
+                order._delivery_due_total() if order else 0.0
+            ) - (order.delivery_paid_amount or 0.0)
 
     # ── Acciones ──
     def action_request(self):

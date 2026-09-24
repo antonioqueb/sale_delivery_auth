@@ -104,16 +104,20 @@ class SaleOrder(models.Model):
         'invoice_ids.move_type',
         'amount_total',
         'currency_id',
+        'order_line.qty_delivered',
+        'order_line.product_uom_qty',
+        'order_line.price_total',
     )
     def _compute_delivery_paid(self):
         for order in self:
             paid, has_posted = order._delivery_paid_live()
             order.delivery_paid_amount = paid
+            due = order._delivery_due_total()
             rounding = order.currency_id.rounding or 0.01
             order.delivery_is_fully_paid = bool(
                 order.amount_total > 0
                 and has_posted
-                and float_compare(paid, order.amount_total, precision_rounding=rounding) >= 0
+                and float_compare(paid, due, precision_rounding=rounding) >= 0
             )
 
     def _delivery_paid_live(self):
@@ -129,6 +133,39 @@ class SaleOrder(models.Model):
             inv_paid = (inv.amount_total or 0.0) - (inv.amount_residual or 0.0)
             paid += -inv_paid if inv.move_type == 'out_refund' else inv_paid
         return paid, bool(posted)
+
+    def _delivery_due_total(self):
+        """Total que el cliente debe cubrir para entregar: amount_total menos
+        lo que ya no se le cobra. Por renglón se descuenta lo MAYOR entre
+        (a) las notas de crédito PUBLICADAS del renglón y (b) lo FINIQUITADO
+        (solicitado − entregado neto de un renglón cerrado en corto). Sin
+        esto, una devolución finiquitada seguía cobrándose: V/775 devolvió
+        11 m² de Pórfido guillotina ($8,038.80), se agregó el de disco por el
+        mismo importe y la entrega exigía $32,437.08 con $24,398.28 pagados.
+        Notas de crédito sin renglón de venta se restan completas."""
+        self.ensure_one()
+        credit = 0.0
+        for line in self.order_line:
+            refunded = sum(
+                aml.price_total
+                for aml in line.invoice_lines
+                if aml.move_id.move_type == 'out_refund'
+                and aml.move_id.state == 'posted'
+            )
+            closed = 0.0
+            if 'x_finiquitado' in line._fields and line.x_finiquitado \
+                    and line.product_uom_qty > 0:
+                net = line.x_delivered_net_qty \
+                    if 'x_delivered_net_qty' in line._fields else line.qty_delivered
+                missing = max(line.product_uom_qty - (net or 0.0), 0.0)
+                closed = line.price_total * missing / line.product_uom_qty
+            credit += max(refunded, closed)
+        loose = self.invoice_ids.filtered(
+            lambda m: m.move_type == 'out_refund' and m.state == 'posted'
+        ).mapped('invoice_line_ids').filtered(
+            lambda l: l.display_type == 'product' and not l.sale_line_ids)
+        credit += sum(loose.mapped('price_total'))
+        return max((self.amount_total or 0.0) - credit, 0.0)
 
     @api.depends(
         'delivery_is_fully_paid',
@@ -176,7 +213,7 @@ class SaleOrder(models.Model):
         vigente, así los residuos cambiarios chicos también quedan
         cubiertos."""
         self.ensure_one()
-        pending = max((self.amount_total or 0.0) - (paid or 0.0), 0.0)
+        pending = max(self._delivery_due_total() - (paid or 0.0), 0.0)
         mxn = self.env.ref('base.MXN', raise_if_not_found=False)
         if not mxn or not self.currency_id or self.currency_id == mxn:
             return pending
@@ -198,10 +235,11 @@ class SaleOrder(models.Model):
         self.ensure_one()
         rounding = self.currency_id.rounding or 0.01
         paid, has_posted = self._delivery_paid_live()
+        due = self._delivery_due_total()
         fully_paid = bool(
             self.amount_total > 0
             and has_posted
-            and float_compare(paid, self.amount_total, precision_rounding=rounding) >= 0
+            and float_compare(paid, due, precision_rounding=rounding) >= 0
         )
         if fully_paid:
             return True
@@ -215,7 +253,7 @@ class SaleOrder(models.Model):
         # cualquier residuo chico: diferencias cambiarias y redondeos.
         # Con el contexto som_log_delivery_tolerance (validación real de
         # la entrega) la aplicación queda registrada en el chatter.
-        if self.amount_total > 0 and has_posted and paid > 0:
+        if due > 0 and has_posted and paid > 0:
             pending_mxn = self._delivery_pending_mxn(paid)
             tolerance = self._delivery_payment_tolerance_mxn()
             if pending_mxn > 0 and float_compare(
@@ -230,7 +268,7 @@ class SaleOrder(models.Model):
                             'pend': pending_mxn,
                             'tol': tolerance,
                             'paid': paid,
-                            'total': self.amount_total or 0.0,
+                            'total': due,
                             'cur': self.currency_id.name or '',
                         })
                 return True
