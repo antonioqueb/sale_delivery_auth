@@ -1,7 +1,7 @@
 import logging
 
 from odoo import models, fields, api, _
-from odoo.exceptions import UserError
+from odoo.exceptions import AccessError, UserError
 
 _logger = logging.getLogger(__name__)
 
@@ -248,7 +248,48 @@ class DeliveryAuthRequest(models.Model):
                     '[DELIVERY AUTH] No se pudieron cerrar las actividades '
                     'de %s.', rec.display_name)
 
+    # Transiciones de estado que un NO aprobador puede hacer (enviar,
+    # cancelar la suya, restablecer). Aprobar/rechazar y los datos de quién
+    # decidió solo los escribe un aprobador: el vendedor tiene escritura en
+    # el modelo y por RPC podía fabricar una solicitud «Aprobada».
+    _SOM_NON_APPROVER_TRANSITIONS = {
+        ('draft', 'requested'),
+        ('draft', 'cancelled'),
+        ('requested', 'cancelled'),
+        ('cancelled', 'draft'),
+        ('rejected', 'draft'),
+    }
+
+    def _som_check_non_approver_vals(self, vals, creating=False):
+        if self.env['sale.order']._som_is_delivery_approver():
+            return
+        denied = _('Solo un Gerente de Aprobación de Entregas puede aprobar o '
+                   'rechazar solicitudes de entrega.')
+        if any(vals.get(f) for f in ('approved_by_id', 'approval_date', 'rejection_notes')):
+            raise AccessError(denied)
+        if vals.get('requested_by_id') and vals['requested_by_id'] != self.env.uid:
+            raise AccessError(denied)
+        if creating:
+            if vals.get('state', 'draft') != 'draft':
+                raise AccessError(denied)
+            return
+        if 'sale_order_id' in vals and any(
+                rec.sale_order_id.id != vals['sale_order_id'] for rec in self):
+            raise AccessError(_('No se puede mover una solicitud de autorización a otra orden.'))
+        if 'state' in vals:
+            for rec in self:
+                if rec.state != vals['state'] and \
+                        (rec.state, vals['state']) not in self._SOM_NON_APPROVER_TRANSITIONS:
+                    raise AccessError(denied)
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        for vals in vals_list:
+            self._som_check_non_approver_vals(vals, creating=True)
+        return super().create(vals_list)
+
     def write(self, vals):
+        self._som_check_non_approver_vals(vals)
         res = super().write(vals)
         # Estado terminal (venga del botón, del wizard de rechazo o de la
         # cancelación): las actividades de autorización se dan por

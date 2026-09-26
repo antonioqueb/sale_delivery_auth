@@ -2,7 +2,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from odoo import models, fields, api, _
-from odoo.exceptions import UserError
+from odoo.exceptions import AccessError, UserError
 from odoo.tools.float_utils import float_compare
 
 MONTERREY_TZ = ZoneInfo('America/Monterrey')
@@ -273,6 +273,50 @@ class SaleOrder(models.Model):
                         })
                 return True
         return False
+
+    # ------------------------------------------------------------------
+    # Candado de escritura: los campos que ABREN la entrega sin pago solo
+    # los escribe el flujo de aprobación (aprobador) o el sistema. Antes un
+    # vendedor podía hacer write({'delivery_auth_manual_authorized': True})
+    # por RPC sobre su orden y validar la remisión con $0 pagado. No se usa
+    # groups= en el campo: custodia, WhatsApp y el asistente lo LEEN como
+    # cualquier usuario. El contexto no sirve de llave (lo manda el cliente).
+    # ------------------------------------------------------------------
+    _SOM_DELIVERY_AUTH_PROTECTED = (
+        'delivery_auth_manual_authorized',
+        'delivery_auth_authorized_amount',
+        'delivery_auth_state',
+        'delivery_paid_amount',
+        'delivery_is_fully_paid',
+    )
+
+    def _som_is_delivery_approver(self):
+        user = self.env.user
+        return (
+            self.env.su
+            or user.has_group('base.group_system')
+            or user.has_group('sale_delivery_auth.group_delivery_approver')
+        )
+
+    def _som_check_delivery_auth_fields(self, vals_list):
+        touched = sorted({
+            fname for vals in vals_list
+            for fname in self._SOM_DELIVERY_AUTH_PROTECTED if fname in vals
+        })
+        if touched and not self._som_is_delivery_approver():
+            raise AccessError(_(
+                'Solo un Gerente de Aprobación de Entregas puede modificar la '
+                'autorización o el estado de pago de la entrega (%s). Usa '
+                '«Entregar sin pago» para solicitarla.') % ', '.join(touched))
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        self._som_check_delivery_auth_fields(vals_list)
+        return super().create(vals_list)
+
+    def write(self, vals):
+        self._som_check_delivery_auth_fields([vals])
+        return super().write(vals)
 
     def _set_manual_delivery_authorization(self):
         """Marca la entrega como autorizada manualmente al total ACTUAL."""
