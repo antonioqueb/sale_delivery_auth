@@ -80,7 +80,7 @@
                     <notebook>
                         <page string="Motivo de Solicitud" name="request_notes">
                             <field name="request_notes"
-                                   placeholder="Indique la razón por la que se solicita entregar sin pago total..."
+                                   placeholder="Motivo obligatorio: indique la razón por la que se solicita entregar sin pago total..."
                                    readonly="state != 'draft'"/>
                         </page>
                         <page string="Motivo de Rechazo" name="rejection_notes"

@@ -5,7 +5,7 @@ from odoo.exceptions import UserError
 
 class DeliveryAuthSendWizard(models.TransientModel):
     """«Entregar sin pago»: UN solo paso. El vendedor escribe el motivo
-    (opcional) y pulsa «Enviar solicitud»: la solicitud nace y se envía a
+    (OBLIGATORIO desde el 27 sep 2026) y pulsa «Enviar solicitud»: la solicitud nace y se envía a
     los aprobadores en el mismo clic. Antes había que crear el borrador y
     después pulsar «Enviar Solicitud» en otra pantalla (ambiguo)."""
     _name = 'delivery.auth.send.wizard'
@@ -14,6 +14,7 @@ class DeliveryAuthSendWizard(models.TransientModel):
     sale_order_id = fields.Many2one('sale.order', string='Orden', required=True, readonly=True)
     request_notes = fields.Text(
         string='Motivo',
+        required=True,
         help="Por qué se pide entregar sin el pago completo. Lo ven los aprobadores.")
     amount_pending = fields.Monetary(string='Saldo pendiente', compute='_compute_amount_pending',
                                      currency_field='currency_id')
@@ -32,6 +33,8 @@ class DeliveryAuthSendWizard(models.TransientModel):
         reason = order._som_delivery_staff_lock_reason()
         if reason:
             raise UserError(reason)
+        if not (self.request_notes or '').strip():
+            raise UserError(_('Escribe el motivo por el que se entrega sin pago: es obligatorio para enviar la solicitud.'))
         Request = self.env['delivery.auth.request']
         active = order.delivery_auth_request_ids.filtered(lambda r: r.state in ('draft', 'requested'))
         request = active[:1]

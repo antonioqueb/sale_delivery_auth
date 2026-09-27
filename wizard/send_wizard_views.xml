@@ -13,7 +13,8 @@
                     <field name="sale_order_id"/>
                     <field name="amount_pending"/>
                     <field name="request_notes"
-                           placeholder="Motivo (opcional): por qué se entrega sin pago, acuerdo con el cliente…"
+                           required="1"
+                           placeholder="Motivo (obligatorio): por qué se entrega sin pago, acuerdo con el cliente…"
                            widget="text"/>
                 </group>
                 <footer>

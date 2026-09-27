@@ -115,6 +115,11 @@ class DeliveryAuthRequest(models.Model):
         for rec in self:
             if rec.state != 'draft':
                 raise UserError(_('Solo se pueden enviar solicitudes en estado Borrador.'))
+            # Motivo OBLIGATORIO para pedir entregar sin pago (27 sep 2026):
+            # vale para el asistente de la orden y para el botón del
+            # formulario de la solicitud.
+            if not (rec.request_notes or '').strip():
+                raise UserError(_('Escribe el motivo por el que se entrega sin pago: es obligatorio para enviar la solicitud %s.') % rec.display_name)
             rec.write({
                 'state': 'requested',
                 'requested_by_id': self.env.uid,
